@@ -73,9 +73,20 @@ async function run() {
       res.send(result);
     });
 
-    // All Cars
+    // All Cars with Search + Filter
     app.get("/cars", async (req, res) => {
-      const result = await carsCollection.find().toArray();
+      const search = req.query.search || "";
+      const type = req.query.type || "All";
+
+      const query = {
+        name: { $regex: search, $options: "i" },
+      };
+
+      if (type !== "All") {
+        query.type = type;
+      }
+
+      const result = await carsCollection.find(query).toArray();
 
       res.send(result);
     });
@@ -116,7 +127,6 @@ async function run() {
     // Update Car
     app.patch("/cars/:id", async (req, res) => {
       const id = req.params.id;
-
       const updatedCar = req.body;
 
       const result = await carsCollection.updateOne(
@@ -136,11 +146,18 @@ async function run() {
       res.send(result);
     });
 
-    // Add Booking
+    // Add Booking + Increase Booking Count
     app.post("/bookings", async (req, res) => {
       const booking = req.body;
 
       const result = await bookingsCollection.insertOne(booking);
+
+      if (booking.carId && ObjectId.isValid(booking.carId)) {
+        await carsCollection.updateOne(
+          { _id: new ObjectId(booking.carId) },
+          { $inc: { booking_count: 1 } }
+        );
+      }
 
       res.send(result);
     });
@@ -152,6 +169,17 @@ async function run() {
       const result = await bookingsCollection
         .find({ userEmail: email })
         .toArray();
+
+      res.send(result);
+    });
+
+    // Cancel Booking
+    app.delete("/bookings/:id", async (req, res) => {
+      const id = req.params.id;
+
+      const result = await bookingsCollection.deleteOne({
+        _id: new ObjectId(id),
+      });
 
       res.send(result);
     });
